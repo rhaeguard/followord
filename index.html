@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>followord</title>
+</head>
+
+<body>
+    <canvas id="canvas" width="1280" height="720"
+        style="position: absolute; inset: 50% -50% -50% 50%; transform: translate(-50%, -50%);">
+    </canvas>
+
+    <script>
+        const canvas = document.getElementById("canvas")
+        const [WIDTH, HEIGHT] = [
+            1280,
+            720
+        ]
+
+        canvas.height = HEIGHT
+        canvas.width = WIDTH
+
+        const ctx = canvas.getContext("2d")
+
+        let oldWords = []
+        let currentWord = ""
+        let allWords = new Set()
+
+        function renderCenteredText(text, i = 1, prefixColor = "red", suffixColor = "white") {
+            ctx.font = "70px serif";
+            const textWidth = ctx.measureText(text).width
+            const x = (WIDTH - textWidth) / 2
+            const y = (HEIGHT - 100 * i) / 2
+            const prefix = text.slice(0, text.length - 1)
+            const suffix = text.slice(text.length - 1, text.length)
+
+            ctx.fillStyle = prefixColor
+            ctx.fillText(prefix, x, y);
+
+            ctx.fillStyle = suffixColor
+            const prefixWidth = ctx.measureText(prefix).width
+            ctx.fillText(suffix, x + prefixWidth, y);
+        }
+
+        function draw() {
+            ctx.fillStyle = "black"
+            ctx.fillRect(0, 0, WIDTH, HEIGHT)
+            for (let i = 0; i < oldWords.length; i++) {
+                const alpha = 100 - (oldWords.length - i + 1) * 15
+                let color = `rgb(255 255 255 / ${alpha}%)`
+                renderCenteredText(oldWords[i], oldWords.length - i + 1, color, color)
+            }
+            renderCenteredText(currentWord)
+        }
+
+        function loop() {
+            draw()
+            window.requestAnimationFrame(loop)
+        }
+
+        function run() {
+            const alpha = /^[A-Za-z]$/
+            
+            fetch("words.txt")
+                .then(file => file.text())
+                .then(wordsFile => {
+                    const separateWords = wordsFile.split("\n")
+                    separateWords.forEach(word => {
+                        if (word.length > 1) {
+                            allWords.add(word)
+                        }
+                    })
+                    const ix = Math.floor(Math.random() * 19999)
+                    oldWords.push(separateWords[ix])
+                    currentWord = separateWords[ix].charAt(separateWords[ix].length - 1)
+                    return true
+                })
+                .then(() => {
+                    addEventListener("keyup", (event) => {
+                        if (event.code === "Backspace") {
+                            currentWord = currentWord.slice(0, currentWord.length - 1)
+                        } else if (alpha.test(event.key)) {
+                            currentWord += event.key.toLowerCase()
+                        } else if (event.code === "Enter") {
+                            const mustNotBeEmpty = currentWord.trim().length > 0
+                            const mustBeWord = allWords.has(currentWord)
+                            const mustBeNew = !oldWords.includes(currentWord)
+                            const lastWord = oldWords[oldWords.length - 1]
+                            const mustStartWithLastLetter = mustNotBeEmpty && lastWord.charAt(lastWord.length - 1) === currentWord.charAt(0)
+                            if (mustBeWord && mustBeNew && mustStartWithLastLetter) {
+                                oldWords.push(currentWord)
+                                currentWord = currentWord.slice(currentWord.length - 1, currentWord.length)
+                            }
+                        }
+                    })
+                    window.requestAnimationFrame(loop)
+                })
+        }
+
+        run()
+    </script>
+
+</body>
+
+</html>
