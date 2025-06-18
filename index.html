@@ -14,25 +14,44 @@
 
     <script>
         const canvas = document.getElementById("canvas")
-        const [WIDTH, HEIGHT] = [
-            1280,
-            720
-        ]
+        const [WIDTH, HEIGHT] = [1280, 720]
 
         canvas.height = HEIGHT
         canvas.width = WIDTH
 
         const ctx = canvas.getContext("2d")
 
+        let previousTime = 0
         let oldWords = []
         let currentWord = ""
         let allWords = new Set()
+        let currentWordJitterFrameCount = -1
+        let score = 0
+        let scoreJitterFrameCount = -1
+        let secondsLeft = 16
+        let isHomeScreen = true
+        let isGameOver = false
+        let maxScore = 0
+        let instructionsAnimationAlpha = 0.2
 
-        function renderCenteredText(text, i = 1, prefixColor = "red", suffixColor = "white") {
+        function renderJitteryText(text, maxDeviation) {
+            const index = 1
+            const prefixColor = "red"
+            const suffixColor = "white"
+            //
+            const offsetX = (Math.random() * maxDeviation * (currentWordJitterFrameCount % 2 == 0 ? -1 : 1))
+            const offsetY = (Math.random() * maxDeviation * (currentWordJitterFrameCount % 2 == 0 ? -1 : 1))
+            renderCenteredText(
+                text, index, offsetX, offsetY, prefixColor, suffixColor
+            )
+            currentWordJitterFrameCount -= 1
+        }
+
+        function renderCenteredText(text, index = 1, offsetX = 0, offsetY = 0, prefixColor = "red", suffixColor = "white") {
             ctx.font = "70px serif";
             const textWidth = ctx.measureText(text).width
-            const x = (WIDTH - textWidth) / 2
-            const y = (HEIGHT - 100 * i) / 2
+            const x = offsetX + (WIDTH - textWidth) / 2
+            const y = offsetY + (HEIGHT - 100 * index) / 2
             const prefix = text.slice(0, text.length - 1)
             const suffix = text.slice(text.length - 1, text.length)
 
@@ -44,37 +63,178 @@
             ctx.fillText(suffix, x + prefixWidth, y);
         }
 
+        function renderHorizontallyCenteredText(text, y, fontSize, fillStyle="white") {
+            ctx.font = `${fontSize}px serif`;
+            ctx.fillStyle = fillStyle
+            const textWidth = ctx.measureText(text).width
+            const x = (WIDTH - textWidth) / 2
+            ctx.fillText(text, x, y);
+        }
+
+        function renderTextAtPosition(text, x, y) {
+            ctx.font = "70px serif";
+            ctx.fillStyle = "white"
+            ctx.fillText(text, x, y);
+        }
+
         function draw() {
             ctx.fillStyle = "black"
             ctx.fillRect(0, 0, WIDTH, HEIGHT)
+
+            if (isHomeScreen) {
+                renderCenteredText(
+                    `followord`,
+                    index = 1,
+                    offsetX = 0,
+                    offsetY = 0,
+                    prefixColor = "white",
+                    suffixColor = "white"
+                )
+                renderHorizontallyCenteredText(
+                    `continue the chain`,
+                    HEIGHT * 0.6,
+                    fontSize=30
+                )
+                renderHorizontallyCenteredText(
+                    `next word must start with the last letter of the previous`,
+                    HEIGHT * 0.6 + 40,
+                    fontSize=30
+                )
+                const alpha = 20 + (Math.abs(instructionsAnimationAlpha) / 1.8) * 100
+                renderHorizontallyCenteredText(
+                    `press space to start`,
+                    HEIGHT * 0.8,
+                    fontSize=50,
+                    `rgb(255 255 255 / ${alpha}%)`
+                )
+                return
+            }
+
+            if (isGameOver) {
+                renderCenteredText(
+                    `game over`,
+                    index = 1,
+                    offsetX = 0,
+                    offsetY = 0,
+                    prefixColor = "white",
+                    suffixColor = "white"
+                )
+                renderHorizontallyCenteredText(
+                    `max chain length`,
+                    HEIGHT * 0.6,
+                    fontSize=40
+                )
+                renderHorizontallyCenteredText(
+                    `${maxScore}`,
+                    HEIGHT * 0.6 + 40,
+                    fontSize=30
+                )
+                const alpha = 20 + (Math.abs(instructionsAnimationAlpha) / 1.8) * 100
+                renderHorizontallyCenteredText(
+                    `press space to restart`,
+                    HEIGHT * 0.8,
+                    fontSize=50,
+                    `rgb(255 255 255 / ${alpha}%)`
+                )
+                return
+            }
+
+            // render past words
             for (let i = 0; i < oldWords.length; i++) {
                 const alpha = 100 - (oldWords.length - i + 1) * 15
                 let color = `rgb(255 255 255 / ${alpha}%)`
-                renderCenteredText(oldWords[i], oldWords.length - i + 1, color, color)
+                renderCenteredText(
+                    oldWords[i],
+                    index = oldWords.length - i + 1,
+                    offsetX = 0,
+                    offsetY = 0,
+                    prefixColor = color,
+                    suffixColor = color
+                )
             }
-            renderCenteredText(currentWord)
+            // render current word
+            if (currentWordJitterFrameCount < 0) {
+                renderCenteredText(currentWord)
+            } else {
+                let maxDeviation = 15
+                renderJitteryText(currentWord, maxDeviation)
+            }
+
+            // render score
+            let scoreOffsetX = 0
+            let scoreOffsetY = 0
+            if (scoreJitterFrameCount >= 0) {
+                scoreOffsetX = (Math.random() * 20 * (scoreJitterFrameCount % 2 == 0 ? -1 : 1))
+                scoreOffsetY = (Math.random() * 20 * (scoreJitterFrameCount % 2 == 0 ? -1 : 1))
+                scoreJitterFrameCount--;
+            }
+            renderTextAtPosition(
+                `${score}`, scoreOffsetX + 50, scoreOffsetY + 100,
+            )
+
+            // render timer
+            ctx.fillStyle = "red"
+            ctx.fillRect(
+                WIDTH - WIDTH * 0.01,
+                HEIGHT - HEIGHT * secondsLeft / 16,
+                WIDTH * 0.01,
+                HEIGHT,
+            )
         }
 
-        function loop() {
+        function update(dt) {
+            secondsLeft -= dt
+            if (secondsLeft <= 0) {
+                if (oldWords.length > 0) {
+                    const lastWord = oldWords[oldWords.length - 1]
+                    oldWords.pop()
+                    currentWord = lastWord
+                    secondsLeft = 16
+                    score -= 1
+                } else {
+                    isGameOver = true
+                }
+            }
+            
+            if (instructionsAnimationAlpha + dt > 1.8) {
+                instructionsAnimationAlpha *= -1
+            }
+            instructionsAnimationAlpha += dt
+        }
+
+        function loop(currentTime) {
+            currentTime = currentTime * 0.001
+            const dt = currentTime - previousTime;
+            previousTime = currentTime;
+            update(dt)
             draw()
             window.requestAnimationFrame(loop)
         }
 
+        function getRandomFromSet(set) {
+            const randomIndex = Math.floor(Math.random() * set.size);
+            let i = 0;
+            for (const item of set) {
+                if (i === randomIndex) return item;
+                i++;
+            }
+        }
+
         function run() {
             const alpha = /^[A-Za-z]$/
-            
+
             fetch("words.txt")
                 .then(file => file.text())
                 .then(wordsFile => {
-                    const separateWords = wordsFile.split("\n")
-                    separateWords.forEach(word => {
+                    wordsFile.split("\n").forEach(word => {
+                        word = word.trim()
                         if (word.length > 1) {
                             allWords.add(word)
                         }
                     })
-                    const ix = Math.floor(Math.random() * 19999)
-                    oldWords.push(separateWords[ix])
-                    currentWord = separateWords[ix].charAt(separateWords[ix].length - 1)
+                    const randomWord = getRandomFromSet(allWords)
+                    oldWords.push(randomWord)
+                    currentWord = randomWord.charAt(randomWord.length - 1)
                     return true
                 })
                 .then(() => {
@@ -92,7 +252,34 @@
                             if (mustBeWord && mustBeNew && mustStartWithLastLetter) {
                                 oldWords.push(currentWord)
                                 currentWord = currentWord.slice(currentWord.length - 1, currentWord.length)
+                                score += 1
+                                if (score > maxScore) {
+                                    maxScore = score
+                                }
+                                scoreJitterFrameCount = 16
+                                secondsLeft = 16
+                            } else {
+                                currentWordJitterFrameCount = 16
                             }
+                        } else if (event.code === "Space" && isGameOver == true) {
+                            oldWords = []
+                            const randomWord = getRandomFromSet(allWords)
+                            oldWords.push(randomWord)
+                            currentWord = randomWord.charAt(randomWord.length - 1)
+                            scoreJitterFrameCount = 16
+                            secondsLeft = 16
+                            currentWordJitterFrameCount = 16
+                            score = 0
+                            isGameOver = false
+                        } else if (event.code === "Space" && isHomeScreen == true) {
+                            oldWords = ["followord"]
+                            currentWord = "d"
+                            scoreJitterFrameCount = 16
+                            secondsLeft = 16
+                            currentWordJitterFrameCount = 16
+                            score = 0
+                            isGameOver = false
+                            isHomeScreen = false
                         }
                     })
                     window.requestAnimationFrame(loop)
