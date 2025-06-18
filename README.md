@@ -2,7 +2,7 @@
 
 a word chain game
 
-- [x core mechanic (new word following the last letter of the last word)
+- [x] core mechanic (new word following the last letter of the last word)
 - [ ] point system (more points for rarity?)
 - [x] a better and lightweight dictionary
 - [x] game intro screen with instructions/tutorial
