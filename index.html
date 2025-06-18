@@ -11,6 +11,7 @@
     <canvas id="canvas" width="1280" height="720"
         style="position: absolute; inset: 50% -50% -50% 50%; transform: translate(-50%, -50%);">
     </canvas>
+    <audio id="audio" src="audio.ogg" loop hidden type="audio/ogg"></audio>
 
     <script>
         const canvas = document.getElementById("canvas")
@@ -282,6 +283,12 @@
                             isHomeScreen = false
                         }
                     })
+                    try {
+                        const audio = document.getElementById("audio")
+                        audio.volume = 0.3
+                        audio.play()
+                    } catch(e) {
+                    } finally {}
                     window.requestAnimationFrame(loop)
                 })
         }
