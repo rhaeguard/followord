@@ -2,8 +2,8 @@
 // + Each Keyboard Key size should be measured for that specific character
 // + Shorter vibrate ms
 // + Long words shrink if they exceed the width of the keyboard
-// - Better word list
-// - Better text compression
+// + Better word list
+// - Better text compression [no need]
 // + Better instructions
 // + Unaccepted/jitter words trigger vibration
 // - Vibrate doesn't work on iPhone [no fix for this]
@@ -54,18 +54,18 @@ function setupAudio() {
 
 const audioCtx = setupAudio();
 
-let previousTime = 0
+let previousTime = 0;
 let oldWords = [];
-let currentWord = ""
-let allWords = new Set()
-let currentWordJitterFrameCount = -1
-let score = 0
-let scoreJitterFrameCount = -1
-let secondsLeft = 16
-let isHomeScreen = true
-let isGameOver = false
-let isTimed = true
-let maxScore = 0
+let currentWord = "";
+let allWords = new Set();
+let currentWordJitterFrameCount = -1;
+let score = 0;
+let scoreJitterFrameCount = -1;
+let secondsLeft = 16;
+let isHomeScreen = true;
+let isGameOver = false;
+let isTimed = true;
+let maxScore = 0;
 let instructionsAnimationAlpha = 0.2;
 
 let stats = ({
@@ -116,7 +116,7 @@ let keyboard = ({
 
         this.bigKeyWidth = (w - (this.keyWidth * bottom.length + gapX * (bottom.length - 1)) - gapX * 2) / 2;
         
-        const [letterMaxSize, letterFont] = Array.from(top + mid + bottom).map(ch => getPerfectFontSize(
+        const [letterMaxSize, letterFont] = Array.from(top + mid + bottom).map(ch => getBiggestFittingFontSize(
             this.keyWidth * 0.4, 
             this.keyHeight * 0.4, 
             ch, 
@@ -145,8 +145,8 @@ let keyboard = ({
             yy = out.yy
         }
         
-        const [_i1, delFontTemplate] = getPerfectFontSize(this.bigKeyWidth * 0.7, this.keyHeight * 0.7, "Del", (px) => `bold ${px}px Arial`, 20)
-        const [_i2, enterFontTemplate] = getPerfectFontSize(this.bigKeyWidth * 0.7, this.keyHeight * 0.7, "Ent", (px) => `bold ${px}px Arial`, 20)
+        const [_i1, delFontTemplate] = getBiggestFittingFontSize(this.bigKeyWidth * 0.7, this.keyHeight * 0.7, "Del", (px) => `bold ${px}px Arial`, 20)
+        const [_i2, enterFontTemplate] = getBiggestFittingFontSize(this.bigKeyWidth * 0.7, this.keyHeight * 0.7, "Ent", (px) => `bold ${px}px Arial`, 20)
         this.keys.push([xx + gapX, yy, "Del", delFontTemplate])
         this.keys.push([x, yy, "Ent", enterFontTemplate])
         this.posx = x;
@@ -221,7 +221,7 @@ const startButton = ({
     draw: function(text, progress) {
         const alpha = 20 + (Math.abs(progress) / 1.8) * 100;
 
-        const [_p0, font] = getPerfectFontSizeSmaller(
+        const [_p0, font] = getSmallestFittingFontSize(
             this.radius * 2 * 0.7, 
             this.radius * 2 * 0.7, 
             text, 
@@ -253,46 +253,56 @@ const startButton = ({
     }
 }).computeDimensions(WIDTH/2, HEIGHT * 0.75);
 
-function getPerfectFontSize(width, height, text, fontTemplate, startPixelSize) {
-    let perfectFontSizeSoFar = startPixelSize;
+function getPerfectFontSizeCalc(text, startPixelSize, fontTemplateFn, progressFn, fitCheckFn) {
+    let perfectSizeSoFar = startPixelSize;
     let currentPxSize = startPixelSize;
     for (let i=0; i < 40; i++) {
-        ctx.font = fontTemplate(currentPxSize)
-        const measurement = ctx.measureText(text)
-        const textWidth = measurement.width
-        const textHeight = (measurement.actualBoundingBoxAscent + measurement.actualBoundingBoxDescent);
+        ctx.font = fontTemplateFn(currentPxSize)
+        const {width, actualBoundingBoxAscent, actualBoundingBoxDescent} = ctx.measureText(text)
+        const height = actualBoundingBoxAscent + actualBoundingBoxDescent;
 
-        const fits = textWidth <= width && textHeight <= height;
-        if (fits) {
-            perfectFontSizeSoFar = currentPxSize;
-            currentPxSize = Math.floor(currentPxSize * 1.1)
-        } else {
+        const fits = fitCheckFn(width, height)
+        const out = progressFn(currentPxSize, perfectSizeSoFar, fits)
+        let ok = out[0]
+        currentPxSize = out[1]
+        perfectSizeSoFar = out[2]
+
+        if (!ok) {
             break
         }
     }
 
-    return [perfectFontSizeSoFar, fontTemplate(perfectFontSizeSoFar)];
+    return [perfectSizeSoFar, fontTemplateFn(perfectSizeSoFar)];
 }
 
-function getPerfectFontSizeSmaller(width, height, text, fontTemplate, startPixelSize) {
-    let perfectFontSizeSoFar = startPixelSize;
-    let currentPxSize = startPixelSize;
-    for (let i=0; i < 40; i++) {
-        ctx.font = fontTemplate(currentPxSize)
-        const measurement = ctx.measureText(text)
-        const textWidth = measurement.width
-        const textHeight = (measurement.actualBoundingBoxAscent + measurement.actualBoundingBoxDescent);
+function getBiggestFittingFontSize(width, height, text, fontTemplateFn, startPixelSize) {
+    return getPerfectFontSizeCalc(
+        text, 
+        startPixelSize, 
+        fontTemplateFn, 
+        (currentPx, perfectSizeSoFar, fits) => {
+            const ok = fits;
+            const newCurrentPx = fits ?  Math.floor(currentPx * 1.1) : currentPx;
+            const newPerfectPx = fits ? currentPx : perfectSizeSoFar;
+            return [ok, newCurrentPx, newPerfectPx]
+        },
+        (w, h) => w <= width && h <= height
+    )
+}
 
-        const fits = textWidth <= width && textHeight <= height;
-        perfectFontSizeSoFar = currentPxSize;
-        if (fits) {
-            break
-        } else {
-            currentPxSize = Math.floor(currentPxSize * 0.9)
-        }
-    }
-
-    return [perfectFontSizeSoFar, fontTemplate(perfectFontSizeSoFar)];
+function getSmallestFittingFontSize(width, height, text, fontTemplateFn, startPixelSize) {
+    return getPerfectFontSizeCalc(
+        text, 
+        startPixelSize, 
+        fontTemplateFn, 
+        (currentPx, perfectSizeSoFar, fits) => {
+            const ok = !fits;
+            const newCurrentPx = fits ? currentPx : Math.floor(currentPx * 0.9);
+            const newPerfectPx = fits ? currentPx : perfectSizeSoFar;
+            return [ok, newCurrentPx, newPerfectPx]
+        },
+        (w, h) => w <= width && h <= height
+    )
 }
 
 function drawTextInSquare(x, y, width, height, text, font, fillStyle) {
@@ -325,7 +335,7 @@ function renderJitteryText(text, maxDeviation) {
 
 function renderCenteredText(text) {
     const MAX_WIDTH_ALLOWED = WIDTH * 0.5
-    const [_i, font] = getPerfectFontSizeSmaller(
+    const [_i, font] = getSmallestFittingFontSize(
         MAX_WIDTH_ALLOWED, Infinity, text, (px) => `bold ${px}px Arial`, 100
     )
     ctx.font = font;
@@ -353,7 +363,7 @@ function renderWordsInTheBag(
     prefixColor = "red",
     suffixColor = "white",
 ) {
-    const [_, font] = getPerfectFontSizeSmaller(
+    const [_, font] = getSmallestFittingFontSize(
         WIDTH * 0.9,
         Infinity,
         text,
