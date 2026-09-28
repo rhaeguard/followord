@@ -8,9 +8,9 @@ a word chain game
 - [x] a better and lightweight dictionary
 - [x] game intro screen with instructions/tutorial
 - [x] music/sfx?
-- [ ] mobile support???
+- [x] mobile support
 
 # credits
 
 - Background music (_Sketchbook 2024-10-14_) by Abstraction ([website](https://abstractionmusic.com/), [music-loop-bundle](https://tallbeard.itch.io/music-loop-bundle))
-- [30K words](https://github.com/arstgit/high-frequency-vocabulary/blob/master/30k.txt)
+- [unsorted -173122 words](https://github.com/MagicOctopusUrn/wordListsByLength/tree/master)

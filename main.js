@@ -500,7 +500,7 @@ function getRandomFromSet(set) {
 function run() {
     const alpha = /^[A-Za-z]$/
 
-    fetch("words.txt")
+    fetch("unsorted.txt")
         .then(file => file.text())
         .then(wordsFile => {
             wordsFile.split("\n").forEach(word => {
